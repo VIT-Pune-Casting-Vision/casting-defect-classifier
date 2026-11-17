@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Casting Defect Classifier</title>
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f7f6; text-align: center; padding: 40px; }
+        .card { background: white; max-width: 520px; margin: 0 auto; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h2 { color: #1e293b; margin-bottom: 5px; }
+        p { color: #64748b; font-size: 14px; margin-top: 0; }
+        .status { padding: 12px; background-color: #e2f0d9; color: #2e6930; border-radius: 6px; font-weight: bold; margin: 20px 0; font-size: 13px; }
+        input[type="file"] { margin: 15px 0; }
+        .result-box { margin-top: 20px; padding: 15px; border-radius: 8px; font-size: 18px; font-weight: bold; display: none; }
+        .pass { background-color: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+        .fail { background-color: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+        .raw-score { font-size: 12px; color: #64748b; margin-top: 8px; }
+        img { max-width: 100%; height: auto; border-radius: 8px; margin-top: 15px; border: 1px solid #e2e8f0; display: none; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>⚙️ Surface Defect Classifier</h2>
+        <p>Mechanical Engineering Quality Control Project</p>
+        <div id="status" class="status">⏳ Loading ONNX Model...</div>
+
+        <input type="file" id="imageUpload" accept="image/*" disabled>
+
+        <div id="resultBox" class="result-box">
+            <div id="resultText"></div>
+            <div id="rawScore" class="raw-score"></div>
+        </div>
+        <img id="preview" alt="Uploaded Image">
+    </div>
+
+    <script>
+        let session;
+        const statusDiv = document.getElementById('status');
+        const uploadInput = document.getElementById('imageUpload');
+
+        // 1. Load the ONNX model in the browser
+        async function loadModel() {
+            try {
+                session = await ort.InferenceSession.create('./model.onnx');
+                statusDiv.textContent = "✅ Model Loaded: model.onnx";
+                uploadInput.disabled = false;
+            } catch (e) {
+                statusDiv.style.backgroundColor = "#fee2e2";
+                statusDiv.style.color = "#b91c1c";
+                statusDiv.textContent = "❌ Model Load Error: " + e.message;
+            }
+        }
+        loadModel();
+
+        // 2. Process image & run inference on upload
+        uploadInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file || !session) return;
+
+            const img = document.getElementById('preview');
+            img.src = URL.createObjectURL(file);
+            img.style.display = 'block';
+
+            img.onload = async () => {
+                // Resize to 150x150 using an offscreen canvas
+                const canvas = document.createElement('canvas');
+                canvas.width = 150;
+                canvas.height = 150;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, 150, 150);
+                const imgData = ctx.getImageData(0, 0, 150, 150).data;
+
+                // Convert RGBA to normalized Float32 RGB array (NHWC: [1, 150, 15
